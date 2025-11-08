@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HKT Lottery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>HKT Lottery</h1>
+            <p class="subtitle">พร้อมระบบทำนายเลขด้วย AI</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('buy')">
+                <div>
+                    <img src="/src/lottery.png" alt="">
+                    ซื้อลอตเตอร์รี่
+                </div>
+            </button>
+            <button class="tab-btn" onclick="showTab('results')">
+                <div>
+                    <img src="/src/trophy.png" alt="">
+                    ผลรางวัล
+                </div>
+            </button>
+            <button class="tab-btn" onclick="showTab('prediction')">
+                <div>
+                    <img src="/src/generative.png" alt="">
+                    ทำนายเลขด้วย AI
+                </div>
+            </button>
+            <button class="tab-btn" onclick="showTab('admin')">
+                <div>
+                    <img src="/src/backend.png" alt="">
+                    ระบบประกาศผล (Admin)
+                </div>
+            </button>
+        </div>
+
+        <!-- Lottery Sales Section -->
+        <section id="buy-section" class="tab-content active">
+            <h2>CP HKT Lottery</h2>
+            
+            <div class="buy-form-container">
+                <form id="buy-form" onsubmit="submitPurchase(event)">
+                    <div class="form-group">
+                        <label for="customer-name-buy"> Name</label>
+                        <input type="text" id="customer-name-buy" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>งวดที่เปิดให้ซื้อ</label>
+                        <div id="current-draw-info" class="draw-info-box">
+                            กำลังดึงข้อมูลงวดปัจจุบัน...
+                        </div>
+                    </div>
+
+                    <div class="number-entries">
+                        <div class="number-entries-header">
+                            <span>ประเภทเลข</span>
+                            <span>เลข</span>
+                            <span>จำนวนใบ</span>
+                        </div>
+                        <div id="number-entries-container"></div>
+                        <button type="button" class="btn btn-secondary" onclick="addNumberEntry()">➕ เพิ่มเลข</button>
+                    </div>
+
+                    <div class="price-display">
+                        <h3>ราคารวม: <span id="total-price">0</span> บาท</h3>
+                    </div>
+
+                    <button type="submit" class="btn-icon-only btn-buy">
+                        <img src="src/buy.png" alt="ซื้อเลย">
+                    </button>
+                </form>
+
+                <div class="purchase-history">
+                    <h3>
+                        <div>
+                            <img src="\src\checklist.png" alt=""> รายการซื้อของคุณ
+                        </div>
+                    </h3>
+                    <div id="purchase-list">
+                        <p class="empty-message">ยังไม่มีรายการซื้อ</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="tab-content">
+            <h2> <img src="/src/trophy.png"> ผลการออกรางวัล</h2>
+            
+            <div id="results-display" class="results-container">
+                <div class="no-results">
+                   <img src="/src/hourglass.png" alt=""> <p>ยังไม่มีการประกาศผลรางวัล ใจเย็น ๆ น้่า</p>
+                </div>
+            </div>
+
+            <div class="check-winning-section">
+                <h3>ตรวจสอบรางวัล</h3>
+                <p>คลิกที่รายการซื้อของคุณในแท็บ "ซื้อลอตเตอร์รี่" เพื่อตรวจสอบรางวัล</p>
+            </div>
+        </section>
+
+        <!-- AI Prediction Section -->
+        <section id="prediction-section" class="tab-content">
+            <h2>AI ช่วยทำนายเลข</h2>
+            <div class="prediction-container">
+                <div class="prediction-form">
+                    <label for="user-input">
+                        💭 ข้อมูลเพิ่มเติม:
+                    </label>
+                    <textarea 
+                        id="user-input" 
+                        placeholder="เช่น เลขที่ชอบ, งวดที่แล้วออกอะไร, วันเกิด, ความฝัน, ฯลฯ"
+                        rows="4"
+                    ></textarea>
+                    
+                    <button id="predict-btn" class="btn btn-primary" onclick="predictNumbers()">
+                        ขอเลข
+                    </button>
+                </div>
+
+                <div id="prediction-result" class="prediction-result" style="display: none;">
+                    <h3>เลขเด็ด ๆ มาแล้วจ้า:</h3>
+                    
+                    <div class="suggested-section">
+                        <h4>เลขท้าย 2 ตัวแนะนำ:</h4>
+                        <div id="suggested-two-digit" class="suggested-numbers"></div>
+                    </div>
+
+                    <div class="suggested-section">
+                        <h4>เลข 3 ตัวแนะนำ:</h4>
+                        <div id="suggested-three-digit" class="suggested-numbers"></div>
+                    </div>
+
+                    <div id="ai-analysis" class="ai-analysis"></div>
+                </div>
+
+                <div id="prediction-error" class="error-message" style="display: none;"></div>
+            </div>
+        </section>
+
+        <!-- Admin Section -->
+        <section id="admin-section" class="tab-content">
+            <h2>ระบบประกาศผล</h2>
+            
+            <div class="admin-container">
+                <div class="admin-warning">
+                    ⚠️ ส่วนนี้สำหรับผู้ดูแลระบบเท่านั้น
+                </div>
+
+                <form id="admin-form" onsubmit="announceResults(event)">
+                    <!-- เลือกโหมดประกาศผล -->
+                    <div class="form-group">
+                        <label>โหมดการประกาศผล</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="result-mode" value="random" checked onchange="toggleResultMode(this.value)">
+                                <span>สุ่มอัตโนมัติด้วยระบบ Stardust Mixer</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="result-mode" value="manual" onchange="toggleResultMode(this.value)">
+                                <span>กำหนดผลเอง</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- ส่วนสำหรับโหมดสุ่ม -->
+                    <div id="random-mode-section">
+                        <p class="admin-hint">
+                            ระบบจะสุ่มผลรางวัลให้อัตโนมัติ โดยใช้ยอดซื้อจริงผสมกับแรงบันดาลใจที่คุณใส่ให้
+                        </p>
+
+                        <div class="form-group">
+                            <label for="inspiration">แรงบันดาลใจ / ธีม (ใส่หรือไม่ก็ได้)</label>
+                            <textarea 
+                                id="inspiration" 
+                                rows="3" 
+                                placeholder="เช่น เทศกาลสงกรานต์, ความฝันเกี่ยวกับสายรุ้ง, หมายเลขบิลโปรด ฯลฯ"
+                            ></textarea>
+                            <small class="hint-text">ข้อความนี้จะถูกนำไปปรุงน้ำหนักตัวเลขของระบบ Stardust Mixer</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="chaos-level">ระดับความคาดเดาไม่ได้: <span id="chaos-level-display">50%</span></label>
+                            <input 
+                                type="range" 
+                                id="chaos-level" 
+                                min="0" 
+                                max="100" 
+                                value="50" 
+                                oninput="updateChaosDisplay(this.value)"
+                            >
+                            <small class="hint-text">0% = ตามสถิติยอดซื้อ, 100% = เปิดโหมดสุ่มสุดขอบจักรวาล</small>
+                        </div>
+                    </div>
+
+                    <!-- ส่วนสำหรับโหมดกำหนดผลเอง -->
+                    <div id="manual-mode-section" style="display: none;">
+                        <p class="admin-hint">
+                            กำหนดผลรางวัลเองทุกตัว - ผลที่ใส่จะเป็นผลรางวัลสุดท้าย
+                        </p>
+
+                        <div class="form-group">
+                            <label for="manual-first-prize">รางวัลที่ 1 (6 หลัก)</label>
+                            <input 
+                                type="text" 
+                                id="manual-first-prize" 
+                                pattern="\d{6}"
+                                maxlength="6"
+                                placeholder="xxxxxx"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="manual-three-front">เลขหน้า 3 ตัว (คั่นด้วย , )</label>
+                            <input 
+                                type="text" 
+                                id="manual-three-front" 
+                                placeholder="123,456"
+                            >
+                            <small class="hint-text">ตัวอย่าง: 123,456,789</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="manual-three-back">เลขท้าย 3 ตัว (คั่นด้วย , )</label>
+                            <input 
+                                type="text" 
+                                id="manual-three-back" 
+                                placeholder="234,567"
+                            >
+                            <small class="hint-text">ตัวอย่าง: 234,567,890</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="manual-two-back">เลขท้าย 2 ตัว</label>
+                            <input 
+                                type="text" 
+                                id="manual-two-back" 
+                                pattern="\d{2}"
+                                maxlength="2"
+                                placeholder="xx"
+                            >
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="announce-btn">สุ่มประกาศผล</button>
+                </form>
+
+                <div id="admin-story" class="admin-story"></div>
+
+                <!-- Winners List Section -->
+                <div class="winners-section">
+                    <h3>รายชื่อผู้ถูกรางวัลงวดปัจจุบัน</h3>
+                    <button class="btn btn-secondary" onclick="loadWinners()">โหลดรายชื่อผู้ถูกรางวัล</button>
+                    <div id="winners-list" class="winners-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Purchase Modal -->
+        <div id="purchase-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closePurchaseModal()">&times;</span>
+                <h2>รายละเอียดการซื้อ</h2>
+                <div id="purchase-detail"></div>
+                <button class="btn btn-primary" onclick="closePurchaseModal()">ปิด</button>
+            </div>
+        </div>
+
+        <!-- Success Modal -->
+        <div id="success-modal" class="modal">
+            <div class="modal-content success">
+                <span class="close" onclick="closeSuccessModal()">&times;</span>
+                <h2>ซื้อสำเร็จ!</h2>
+                <div id="success-message"></div>
+                <button class="btn btn-primary" onclick="closeSuccessModal()">ปิด</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>⚠️ หมายเหตุ: การทำนายด้วย AI เป็นเพียงการวิเคราะห์ทางสถิติ ไม่รับประกันความถูกต้อง</p>
+            <p>© 2025 ระบบขายลอตเตอร์รี่ออนไลน์</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
