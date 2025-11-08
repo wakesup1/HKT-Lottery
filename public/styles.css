@@ -519,6 +519,49 @@ h1, h2, h3, h4, h5, h6,
     margin-bottom: 10px;
 }
 
+.purchase-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.purchase-action-btn {
+    flex: 1;
+    border-radius: 999px;
+    border: 1px solid var(--primary);
+    background: transparent;
+    color: var(--primary);
+    padding: 8px 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+}
+
+.purchase-action-btn.edit:hover:not(:disabled) {
+    background: rgba(111, 123, 248, 0.1);
+}
+
+.purchase-action-btn.delete {
+    border-color: #f0657d;
+    color: #f0657d;
+}
+
+.purchase-action-btn.delete:hover:not(:disabled) {
+    background: rgba(240, 101, 125, 0.12);
+}
+
+.purchase-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.purchase-lock-note {
+    font-size: 0.85em;
+    color: #b34700;
+    margin-top: 6px;
+}
+
 .purchase-entry {
     background: rgba(255, 255, 255, 0.9);
     border-radius: 10px;

@@ -266,6 +266,26 @@ HKT-Lottery/
 }
 ```
 
+### PUT /api/purchase/:id
+แก้ไขชื่อผู้ซื้อหรือปรับเลขที่เลือกได้ก่อนที่จะประกาศผลงวดนั้น (รองรับการส่งทั้งสองอย่างหรืออย่างใดอย่างหนึ่ง)
+
+**Request Body (ตัวอย่าง):**
+```json
+{
+  "customerName": "ชื่อใหม่",
+  "entries": [
+    {
+      "numberType": "twoDigitBack",
+      "number": "57",
+      "amount": 2
+    }
+  ]
+}
+```
+
+### DELETE /api/purchase/:id
+ยกเลิกรายการซื้อที่ยังอยู่สถานะ `pending` และยังไม่ประกาศผลรางวัลของงวดนั้น
+
 รองรับ `numberType` ค่าเดียวกับหน้าเว็บ ได้แก่ `twoDigitBack`, `threeDigitFront`, `threeDigitBack`
 
 ### GET /api/purchases

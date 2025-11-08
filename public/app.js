@@ -33,6 +33,7 @@ let entryCounter = 0;
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
   setupForm();
+  setupPurchaseListInteractions();
   loadPurchaseHistory();
   loadResults();
 });
@@ -46,6 +47,38 @@ function setupForm() {
   if (chaosSlider) {
     updateChaosDisplay(chaosSlider.value);
   }
+}
+
+function setupPurchaseListInteractions() {
+  const listElement = document.getElementById('purchase-list');
+  if (!listElement || listElement.dataset.listenerAttached) {
+    return;
+  }
+
+  listElement.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('.purchase-action-btn');
+    if (actionButton) {
+      event.stopPropagation();
+      const purchaseId = actionButton.dataset.purchaseId;
+      const actionType = actionButton.dataset.action;
+      if (!purchaseId || !actionType) {
+        return;
+      }
+      if (actionType === 'edit') {
+        handleEditPurchase(purchaseId);
+      } else if (actionType === 'delete') {
+        handleDeletePurchase(purchaseId);
+      }
+      return;
+    }
+
+    const purchaseCard = event.target.closest('.purchase-item');
+    if (purchaseCard && purchaseCard.dataset.purchaseId) {
+      checkWinning(purchaseCard.dataset.purchaseId);
+    }
+  });
+
+  listElement.dataset.listenerAttached = 'true';
 }
 
 function updateChaosDisplay(value) {
@@ -426,6 +459,51 @@ function formatThaiDateTime(value) {
   return date.toLocaleString('th-TH');
 }
 
+function escapeAttribute(value = '') {
+  return String(value).replace(/"/g, '&quot;');
+}
+
+function normalizePurchaseId(value) {
+  return String(value || '');
+}
+
+function getPurchaseById(purchaseId) {
+  const targetId = normalizePurchaseId(purchaseId);
+  return purchaseHistory.find((purchase) => normalizePurchaseId(purchase.id || purchase._id) === targetId);
+}
+
+function upsertPurchaseInHistory(updatedPurchase) {
+  if (!updatedPurchase) {
+    return;
+  }
+
+  const updatedId = normalizePurchaseId(updatedPurchase.id || updatedPurchase._id);
+  let replaced = false;
+
+  purchaseHistory = purchaseHistory.map((purchase) => {
+    const existingId = normalizePurchaseId(purchase.id || purchase._id);
+    if (existingId === updatedId) {
+      replaced = true;
+      return { ...purchase, ...updatedPurchase };
+    }
+    return purchase;
+  });
+
+  if (!replaced) {
+    purchaseHistory.unshift(updatedPurchase);
+  }
+
+  displayPurchaseHistory();
+}
+
+function removePurchaseFromHistory(purchaseId) {
+  const targetId = normalizePurchaseId(purchaseId);
+  purchaseHistory = purchaseHistory.filter(
+    (purchase) => normalizePurchaseId(purchase.id || purchase._id) !== targetId
+  );
+  displayPurchaseHistory();
+}
+
 function updateCurrentDrawDisplay() {
   const drawBox = document.getElementById('current-draw-info');
   if (!drawBox) {
@@ -569,9 +647,19 @@ function displayPurchaseHistory() {
         .join('');
 
       const purchaseId = String(purchase.id || purchase._id || '').replace(/'/g, "\\'");
+      const canModify = purchase.canModify ?? purchase.status === 'pending';
+      const modifyReason = purchase.modifyDisabledReason || 'ไม่สามารถแก้ไขรายการนี้ได้';
+      const disabledTitle = !canModify && modifyReason ? ` title="${escapeAttribute(modifyReason)}"` : '';
+      const actionsHtml = `
+        <div class="purchase-actions">
+          <button type="button" class="purchase-action-btn edit" data-action="edit" data-purchase-id="${purchaseId}" ${canModify ? '' : 'disabled'}${disabledTitle}>✏️ แก้ชื่อ</button>
+          <button type="button" class="purchase-action-btn delete" data-action="delete" data-purchase-id="${purchaseId}" ${canModify ? '' : 'disabled'}${disabledTitle}>🗑️ ยกเลิก</button>
+        </div>
+        ${!canModify && modifyReason ? `<div class="purchase-lock-note">${modifyReason}</div>` : ''}
+      `;
 
       return `
-        <div class="purchase-item ${statusClass}" onclick="checkWinning('${purchaseId}')">
+        <div class="purchase-item ${statusClass}" data-purchase-id="${purchaseId}">
           <div class="purchase-item-header">
             <div class="type-badge">${purchase.drawLabel || 'งวดปัจจุบัน'}</div>
             <div class="purchase-status">${statusIcon} ${statusLabel}</div>
@@ -581,10 +669,97 @@ function displayPurchaseHistory() {
           </div>
           <p><strong>รวม:</strong> ${purchase.totalPrice} บาท</p>
           <small>${purchase.customerName} • ${formatThaiDateTime(purchase.purchaseDate)}</small>
+          ${actionsHtml}
         </div>
       `;
     })
     .join('');
+}
+
+async function handleEditPurchase(purchaseId) {
+  const purchase = getPurchaseById(purchaseId);
+  if (!purchase) {
+    return;
+  }
+
+  if (!purchase.canModify) {
+    alert(purchase.modifyDisabledReason || 'ไม่สามารถแก้ไขรายการนี้ได้');
+    return;
+  }
+
+  const newName = prompt('กรุณากรอกชื่อผู้ซื้อใหม่', purchase.customerName || '');
+  if (newName === null) {
+    return;
+  }
+
+  const trimmedName = newName.trim();
+  if (!trimmedName) {
+    alert('ชื่อผู้ซื้อต้องไม่เว้นว่าง');
+    return;
+  }
+
+  if (trimmedName === purchase.customerName) {
+    return;
+  }
+
+  await submitPurchaseUpdate(purchaseId, { customerName: trimmedName }, 'แก้ไขชื่อเรียบร้อยแล้ว');
+}
+
+async function handleDeletePurchase(purchaseId) {
+  const purchase = getPurchaseById(purchaseId);
+  if (!purchase) {
+    return;
+  }
+
+  if (!purchase.canModify) {
+    alert(purchase.modifyDisabledReason || 'ไม่สามารถยกเลิกรายการนี้ได้');
+    return;
+  }
+
+  const confirmed = confirm(`ยืนยันจะยกเลิกใบเสร็จของ ${purchase.customerName || 'ลูกค้า'} ?`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/purchase/${purchaseId}`, {
+      method: 'DELETE'
+    });
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      removePurchaseFromHistory(purchaseId);
+      alert('ยกเลิกรายการเรียบร้อยแล้ว');
+    } else {
+      throw new Error(result.message || 'ไม่สามารถยกเลิกรายการได้');
+    }
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    alert(error.message || 'ไม่สามารถยกเลิกรายการได้');
+  }
+}
+
+async function submitPurchaseUpdate(purchaseId, payload, successMessage) {
+  try {
+    const response = await fetch(`${API_URL}/purchase/${purchaseId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+
+    if (response.ok && result.success && result.data) {
+      upsertPurchaseInHistory(result.data);
+      alert(successMessage || 'อัปเดตข้อมูลสำเร็จ');
+    } else {
+      throw new Error(result.message || 'ไม่สามารถแก้ไขรายการได้');
+    }
+  } catch (error) {
+    console.error('Error updating purchase:', error);
+    alert(error.message || 'ไม่สามารถแก้ไขรายการได้');
+  }
 }
 
 // Load purchase history

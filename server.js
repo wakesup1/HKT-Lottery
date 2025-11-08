@@ -81,6 +81,58 @@ const numberTypeConfig = {
   }
 };
 
+const normalizeEntryPayload = (entries) => {
+  if (!entries || !Array.isArray(entries) || entries.length === 0) {
+    return {
+      error: 'กรุณาเพิ่มเลขที่ต้องการซื้ออย่างน้อย 1 รายการ'
+    };
+  }
+
+  const normalizedEntries = [];
+  let totalPrice = 0;
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index] || {};
+    const numberType = entry.numberType;
+    const number = typeof entry.number === 'string' ? entry.number.trim() : '';
+    const amount = parseInt(entry.amount, 10);
+
+    if (!numberType || !number || Number.isNaN(amount) || amount <= 0) {
+      return {
+        error: `รายการที่ ${index + 1} ข้อมูลไม่ครบถ้วน`
+      };
+    }
+
+    const config = numberTypeConfig[numberType];
+    if (!config) {
+      return {
+        error: `ประเภทเลขของรายการที่ ${index + 1} ไม่ถูกต้อง`
+      };
+    }
+
+    if (number.length !== config.length || !/^\d+$/.test(number)) {
+      return {
+        error: `รายการที่ ${index + 1}: กรุณากรอกตัวเลข ${config.length} หลัก`
+      };
+    }
+
+    const entryPrice = config.price;
+    totalPrice += entryPrice * amount;
+
+    normalizedEntries.push({
+      numberType,
+      number,
+      amount,
+      status: 'pending'
+    });
+  }
+
+  return {
+    normalizedEntries,
+    totalPrice
+  };
+};
+
 const DRAW_INTERVAL_DAYS = 15;
 
 const addDays = (date, days) => {
@@ -144,6 +196,55 @@ const ensureActiveDraw = async () => {
 
   await newDraw.save();
   return newDraw;
+};
+
+const buildPurchaseResponse = (purchase, drawInfo, options = {}) => {
+  const { allowModification = true, disabledReason = '' } = options;
+  const drawDateSource = drawInfo || { drawDate: purchase.drawDate, date: purchase.drawDate };
+  const drawDate = resolveDrawDate(drawDateSource) || purchase.purchaseDate;
+  const drawLabel = (drawInfo && drawInfo.label) || purchase.drawLabel || (drawDate ? formatDrawLabel(drawDate) : 'ไม่พบข้อมูลงวด');
+  const isPending = purchase.status === 'pending';
+  const canModify = isPending && allowModification;
+  let modifyDisabledReason = '';
+
+  if (!canModify) {
+    if (!isPending) {
+      modifyDisabledReason = 'รายการนี้ตรวจผลแล้ว';
+    } else if (!allowModification) {
+      modifyDisabledReason = disabledReason || 'งวดนี้ประกาศผลแล้ว';
+    }
+  }
+
+  const entriesSource = Array.isArray(purchase.entries) ? purchase.entries : [];
+
+  return {
+    id: purchase._id,
+    drawId: purchase.drawId,
+    drawLabel,
+    drawSequence: drawInfo ? drawInfo.sequence : purchase.drawSequence,
+    drawDate,
+    customerName: purchase.customerName,
+    entries: entriesSource.map((entry, index) => {
+      const config = numberTypeConfig[entry.numberType] || {};
+      const price = config.price || entry.price || 1;
+      return {
+        id: Date.now() + index,
+        numberType: entry.numberType,
+        number: entry.number,
+        label: config.label || entry.label || entry.numberType,
+        prizeLabel: config.prizeLabel || entry.prizeLabel || '',
+        amount: entry.amount,
+        price,
+        totalPrice: price * entry.amount,
+        status: entry.status
+      };
+    }),
+    totalPrice: purchase.totalPrice,
+    purchaseDate: purchase.purchaseDate,
+    status: purchase.status,
+    canModify,
+    modifyDisabledReason: modifyDisabledReason || undefined
+  };
 };
 
 // Connect to MongoDB and ensure at least one active draw exists
@@ -554,51 +655,15 @@ app.post('/api/purchase', async (req, res) => {
         message: 'ไม่พบงวดที่เปิดอยู่'
       });
     }
-    const activeDrawDate = resolveDrawDate(activeDraw);
-
-    const normalizedEntries = [];
-    let totalPrice = 0;
-
-    for (let index = 0; index < entries.length; index += 1) {
-      const entry = entries[index] || {};
-      const numberType = entry.numberType;
-      const number = typeof entry.number === 'string' ? entry.number.trim() : '';
-      const amount = parseInt(entry.amount, 10);
-
-      if (!numberType || !number || Number.isNaN(amount) || amount <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: `รายการที่ ${index + 1} ข้อมูลไม่ครบถ้วน`
-        });
-      }
-
-      const config = numberTypeConfig[numberType];
-      if (!config) {
-        return res.status(400).json({
-          success: false,
-          message: `ประเภทเลขของรายการที่ ${index + 1} ไม่ถูกต้อง`
-        });
-      }
-
-      if (number.length !== config.length || !/^\d+$/.test(number)) {
-        return res.status(400).json({
-          success: false,
-          message: `รายการที่ ${index + 1}: กรุณากรอกตัวเลข ${config.length} หลัก`
-        });
-      }
-
-      const entryPrice = config.price;
-      const entryTotal = entryPrice * amount;
-
-      normalizedEntries.push({
-        numberType,
-        number,
-        amount,
-        status: 'pending'
+    const validation = normalizeEntryPayload(entries);
+    if (validation.error) {
+      return res.status(400).json({
+        success: false,
+        message: validation.error
       });
-
-      totalPrice += entryTotal;
     }
+
+    const { normalizedEntries, totalPrice } = validation;
 
     const purchase = new Purchase({
       drawId: activeDraw.id,
@@ -611,31 +676,7 @@ app.post('/api/purchase', async (req, res) => {
     await purchase.save();
 
     // แปลงข้อมูลสำหรับส่งกลับไปหา frontend (format เดิม)
-    const responseData = {
-      id: purchase._id,
-      drawId: purchase.drawId,
-      drawLabel: formatDrawLabel(activeDrawDate),
-      drawSequence: activeDraw.sequence,
-      drawDate: activeDrawDate,
-      customerName: purchase.customerName,
-      entries: purchase.entries.map((entry, index) => {
-        const config = numberTypeConfig[entry.numberType];
-        return {
-          id: Date.now() + index,
-          numberType: entry.numberType,
-          number: entry.number,
-          label: config.label,
-          prizeLabel: config.prizeLabel,
-          amount: entry.amount,
-          price: config.price,
-          totalPrice: config.price * entry.amount,
-          status: entry.status
-        };
-      }),
-      totalPrice: purchase.totalPrice,
-      purchaseDate: purchase.purchaseDate,
-      status: purchase.status
-    };
+    const responseData = buildPurchaseResponse(purchase, activeDraw, { allowModification: true });
 
     res.json({
       success: true,
@@ -658,34 +699,25 @@ app.get('/api/purchases', async (req, res) => {
       .sort({ purchaseDate: -1 })
       .lean();
 
+    const drawIds = [...new Set(purchases.map((purchase) => purchase.drawId).filter(Boolean))];
+    const drawMap = new Map();
+
+    if (drawIds.length > 0) {
+      const draws = await Draw.find({ id: { $in: drawIds } }).lean();
+      draws.forEach((draw) => {
+        drawMap.set(draw.id, draw);
+      });
+    }
+
     // แปลงข้อมูลสำหรับ frontend
-    const formattedPurchases = purchases.map(purchase => {
-      // หา draw info
-      const drawLabel = `งวดประจำวันที่ ${purchase.purchaseDate.toLocaleDateString('th-TH')}`;
-      
-      return {
-        id: purchase._id,
-        drawId: purchase.drawId,
-        drawLabel: drawLabel,
-        customerName: purchase.customerName,
-        entries: purchase.entries.map((entry, index) => {
-          const config = numberTypeConfig[entry.numberType];
-          return {
-            id: Date.now() + index,
-            numberType: entry.numberType,
-            number: entry.number,
-            label: config.label,
-            prizeLabel: config.prizeLabel,
-            amount: entry.amount,
-            price: config.price,
-            totalPrice: config.price * entry.amount,
-            status: entry.status
-          };
-        }),
-        totalPrice: purchase.totalPrice,
-        purchaseDate: purchase.purchaseDate,
-        status: purchase.status
-      };
+    const formattedPurchases = purchases.map((purchase) => {
+      const drawInfo = drawMap.get(purchase.drawId) || null;
+      const allowModification = drawInfo ? Boolean(drawInfo.isActive) : false;
+      const disabledReason = drawInfo ? 'งวดนี้ประกาศผลแล้ว' : 'ไม่พบข้อมูลงวด';
+      return buildPurchaseResponse(purchase, drawInfo, {
+        allowModification,
+        disabledReason
+      });
     });
 
     res.json({
@@ -697,6 +729,127 @@ app.get('/api/purchases', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'เกิดข้อผิดพลาดในการดึงข้อมูล'
+    });
+  }
+});
+
+// Update purchase before draw is closed
+app.put('/api/purchase/:id', async (req, res) => {
+  try {
+    const purchaseId = req.params.id;
+    const { customerName, entries } = req.body || {};
+
+    const purchase = await Purchase.findById(purchaseId);
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบข้อมูลการซื้อ'
+      });
+    }
+
+    if (purchase.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่สามารถแก้ไขรายการที่ตรวจผลแล้ว'
+      });
+    }
+
+    const drawInfo = await Draw.findOne({ id: purchase.drawId }).lean();
+    if (!drawInfo || !drawInfo.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'งวดนี้ประกาศผลแล้ว ไม่สามารถแก้ไขได้'
+      });
+    }
+
+    let hasUpdates = false;
+
+    if (customerName && typeof customerName === 'string' && customerName.trim()) {
+      purchase.customerName = customerName.trim();
+      hasUpdates = true;
+    }
+
+    if (entries !== undefined) {
+      const validation = normalizeEntryPayload(entries);
+      if (validation.error) {
+        return res.status(400).json({
+          success: false,
+          message: validation.error
+        });
+      }
+      purchase.entries = validation.normalizedEntries;
+      purchase.totalPrice = validation.totalPrice;
+      hasUpdates = true;
+    }
+
+    if (!hasUpdates) {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุข้อมูลที่ต้องการแก้ไข'
+      });
+    }
+
+    await purchase.save();
+    const responseData = buildPurchaseResponse(purchase, drawInfo, { allowModification: true });
+
+    res.json({
+      success: true,
+      message: 'แก้ไขข้อมูลการซื้อสำเร็จ',
+      data: responseData
+    });
+  } catch (error) {
+    console.error('Error updating purchase:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการแก้ไขข้อมูล'
+    });
+  }
+});
+
+// Delete purchase before draw is closed
+app.delete('/api/purchase/:id', async (req, res) => {
+  try {
+    const purchaseId = req.params.id;
+    const purchase = await Purchase.findById(purchaseId);
+
+    if (!purchase) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบข้อมูลการซื้อ'
+      });
+    }
+
+    if (purchase.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่สามารถลบรายการที่ตรวจผลแล้ว'
+      });
+    }
+
+    const drawInfo = await Draw.findOne({ id: purchase.drawId }).lean();
+    if (!drawInfo || !drawInfo.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'งวดนี้ประกาศผลแล้ว ไม่สามารถลบได้'
+      });
+    }
+
+    await purchase.deleteOne();
+
+    res.json({
+      success: true,
+      message: 'ลบข้อมูลการซื้อสำเร็จ',
+      data: {
+        id: purchaseId,
+        drawId: purchase.drawId
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting purchase:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการลบข้อมูล'
     });
   }
 });
@@ -1002,9 +1155,10 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/results - ดูผลรางวัล`);
   console.log(`   POST /api/results - ประกาศผลรางวัล (Admin)`);
   console.log(`   POST /api/purchase - ซื้อเลข 2-3 ตัว`);
+  console.log(`   PUT  /api/purchase/:id - แก้ไขรายการซื้อ`);
+  console.log(`   DELETE /api/purchase/:id - ลบรายการซื้อ`);
   console.log(`   GET  /api/purchases - ดูรายการซื้อทั้งหมด`);
   console.log(`   POST /api/check-winning - ตรวจสอบรางวัล`);
   console.log(`   GET  /api/winners - ดูรายชื่อผู้ถูกรางวัล (Admin)`);
-  console.log(`   POST /api/predict - ทำนายด้วย AI`);
   console.log(`   POST /api/predict - ทำนายเลขด้วย AI`);
 });
