@@ -1,5 +1,9 @@
 // API Base URL
-const API_URL = 'http://localhost:3000/api';
+const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', ''];
+const isFileProtocol = window.location.protocol === 'file:';
+const isLocalEnv = LOCAL_HOSTS.includes(window.location.hostname) || isFileProtocol;
+const apiBase = isLocalEnv ? 'http://localhost:3000' : window.location.origin;
+const API_URL = `${apiBase.replace(/\/$/, '')}/api`;
 
 const NUMBER_TYPE_CONFIG = {
   twoDigitBack: {
@@ -564,8 +568,10 @@ function displayPurchaseHistory() {
         })
         .join('');
 
+      const purchaseId = String(purchase.id || purchase._id || '').replace(/'/g, "\\'");
+
       return `
-        <div class="purchase-item ${statusClass}" onclick="checkWinning(${purchase.id})">
+        <div class="purchase-item ${statusClass}" onclick="checkWinning('${purchaseId}')">
           <div class="purchase-item-header">
             <div class="type-badge">${purchase.drawLabel || 'งวดปัจจุบัน'}</div>
             <div class="purchase-status">${statusIcon} ${statusLabel}</div>

@@ -17,7 +17,8 @@ const drawSchema = new mongoose.Schema({
   },
   date: {
     type: Date,
-    required: true
+    required: true,
+    alias: 'drawDate' // allow using drawDate everywhere else in the app
   },
   isActive: {
     type: Boolean,

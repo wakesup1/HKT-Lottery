@@ -15,9 +15,6 @@ const Purchase = require('./models/Purchase');
 const LotteryResult = require('./models/LotteryResult');
 const Draw = require('./models/Draw');
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -93,12 +90,68 @@ const addDays = (date, days) => {
 };
 
 const formatDrawLabel = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return 'งวดประจำวันที่ -';
+  }
   return `งวดประจำวันที่ ${date.toLocaleDateString('th-TH', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   })}`;
 };
+
+const resolveDrawDate = (draw) => {
+  if (!draw) {
+    return null;
+  }
+  const raw =
+    draw.drawDate ||
+    draw.date ||
+    (typeof draw.get === 'function' ? draw.get('drawDate') || draw.get('date') : null);
+
+  if (!raw) {
+    return null;
+  }
+
+  return raw instanceof Date ? raw : new Date(raw);
+};
+
+const ensureActiveDraw = async () => {
+  let activeDraw = await Draw.getActiveDraw();
+
+  if (activeDraw) {
+    if (!activeDraw.label) {
+      const drawDate = resolveDrawDate(activeDraw) || new Date();
+      activeDraw.label = formatDrawLabel(drawDate);
+      await activeDraw.save();
+    }
+    return activeDraw;
+  }
+
+  const latestDraw = await Draw.findOne().sort({ sequence: -1 });
+  const lastSequence = latestDraw && typeof latestDraw.sequence === 'number' ? latestDraw.sequence : 0;
+  const lastDate = resolveDrawDate(latestDraw);
+  const baseDate = lastDate ? addDays(lastDate, DRAW_INTERVAL_DAYS) : addDays(new Date(), DRAW_INTERVAL_DAYS);
+  const nextSequence = lastSequence + 1 || 1;
+
+  const newDraw = new Draw({
+    id: `DRAW-${nextSequence.toString().padStart(4, '0')}`,
+    label: formatDrawLabel(baseDate),
+    sequence: nextSequence,
+    drawDate: baseDate,
+    isActive: true
+  });
+
+  await newDraw.save();
+  return newDraw;
+};
+
+// Connect to MongoDB and ensure at least one active draw exists
+connectDB()
+  .then(() => ensureActiveDraw())
+  .catch((error) => {
+    console.error('Error ensuring initial draw:', error);
+  });
 
 const createDraw = (sequence, baseDate = new Date()) => {
   return {
@@ -327,21 +380,19 @@ const generateCreativeLotteryResults = ({
 // Get lottery results
 app.get('/api/results', async (req, res) => {
   try {
-    const activeDraw = await Draw.getActiveDraw();
+    const activeDraw = await ensureActiveDraw();
     const latestResult = await LotteryResult.getLatest();
     
+    const activeDrawDate = resolveDrawDate(activeDraw);
+
     res.json({
       success: true,
       data: latestResult || lotteryResults,
       currentDraw: activeDraw ? {
         id: activeDraw.id,
-        label: `งวดประจำวันที่ ${activeDraw.drawDate.toLocaleDateString('th-TH', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })}`,
+        label: formatDrawLabel(activeDrawDate),
         sequence: activeDraw.sequence,
-        date: activeDraw.drawDate
+        date: activeDrawDate
       } : null
     });
   } catch (error) {
@@ -358,23 +409,20 @@ app.post('/api/results', async (req, res) => {
   try {
     const { inspiration, chaosLevel, isLocked, manualResults } = req.body || {};
     
-    const activeDraw = await Draw.getActiveDraw();
+    const activeDraw = await ensureActiveDraw();
     if (!activeDraw) {
       return res.status(400).json({
         success: false,
         message: 'ไม่พบงวดที่เปิดอยู่'
       });
     }
+    const announcedDrawDate = resolveDrawDate(activeDraw) || new Date();
 
     const announcedDraw = {
       id: activeDraw.id,
-      label: `งวดประจำวันที่ ${activeDraw.drawDate.toLocaleDateString('th-TH', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })}`,
+      label: formatDrawLabel(announcedDrawDate),
       sequence: activeDraw.sequence,
-      date: activeDraw.drawDate
+      date: announcedDrawDate
     };
 
     let resultData;
@@ -383,12 +431,14 @@ app.post('/api/results', async (req, res) => {
     if (isLocked && manualResults) {
       resultData = {
         drawId: announcedDraw.id,
+        drawLabel: announcedDraw.label,
+        drawSequence: announcedDraw.sequence,
         firstPrize: manualResults.firstPrize,
         threeDigitFront: manualResults.threeDigitFront || [],
         threeDigitBack: manualResults.threeDigitBack || [],
         twoDigitBack: manualResults.twoDigitBack,
         isLocked: true,
-        drawDate: new Date(),
+        drawDate: announcedDraw.date || new Date(),
         story: 'ผลรางวัลที่กำหนดโดย Admin',
         inspiration: inspiration || 'กำหนดเอง',
         chaosLevel: 0,
@@ -424,19 +474,23 @@ app.post('/api/results', async (req, res) => {
       customerPurchases = oldPurchases;
 
       resultData = {
-        drawId: generatedResults.drawId,
-        firstPrize: generatedResults.firstPrize,
-        threeDigitFront: generatedResults.threeDigitFront,
-        threeDigitBack: generatedResults.threeDigitBack,
-        twoDigitBack: generatedResults.twoDigitBack,
+        ...generatedResults,
+        drawId: generatedResults.drawId || announcedDraw.id,
+        drawLabel: generatedResults.drawLabel || announcedDraw.label,
+        drawSequence: generatedResults.drawSequence || announcedDraw.sequence,
+        drawDate: generatedResults.drawDate || announcedDraw.date || new Date(),
         isLocked: false,
-        drawDate: new Date(),
         story: generatedResults.story,
         inspiration: generatedResults.inspiration,
         chaosLevel: generatedResults.chaosLevel,
         algorithm: generatedResults.algorithm
       };
     }
+
+    // Ensure required draw metadata is present
+    resultData.drawLabel = resultData.drawLabel || announcedDraw.label;
+    resultData.drawSequence = resultData.drawSequence || announcedDraw.sequence;
+    resultData.drawDate = resultData.drawDate || announcedDraw.date || new Date();
 
     // บันทึกผลลง MongoDB
     const newResult = new LotteryResult(resultData);
@@ -446,16 +500,19 @@ app.post('/api/results', async (req, res) => {
     activeDraw.isActive = false;
     await activeDraw.save();
 
-    const nextDrawDate = new Date(activeDraw.drawDate);
+    const nextDrawDate = new Date(announcedDrawDate);
     nextDrawDate.setDate(nextDrawDate.getDate() + DRAW_INTERVAL_DAYS);
 
     const nextDraw = new Draw({
       id: `DRAW-${(activeDraw.sequence + 1).toString().padStart(4, '0')}`,
+      label: formatDrawLabel(nextDrawDate),
       sequence: activeDraw.sequence + 1,
       drawDate: nextDrawDate,
       isActive: true
     });
     await nextDraw.save();
+
+    const savedNextDrawDate = resolveDrawDate(nextDraw) || nextDrawDate;
 
     res.json({
       success: true,
@@ -463,13 +520,9 @@ app.post('/api/results', async (req, res) => {
       data: resultData,
       nextDraw: {
         id: nextDraw.id,
-        label: `งวดประจำวันที่ ${nextDraw.drawDate.toLocaleDateString('th-TH', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        })}`,
+        label: formatDrawLabel(savedNextDrawDate),
         sequence: nextDraw.sequence,
-        date: nextDraw.drawDate
+        date: savedNextDrawDate
       },
       announcedDraw
     });
@@ -494,13 +547,14 @@ app.post('/api/purchase', async (req, res) => {
       });
     }
 
-    const activeDraw = await Draw.getActiveDraw();
+    const activeDraw = await ensureActiveDraw();
     if (!activeDraw) {
       return res.status(400).json({
         success: false,
         message: 'ไม่พบงวดที่เปิดอยู่'
       });
     }
+    const activeDrawDate = resolveDrawDate(activeDraw);
 
     const normalizedEntries = [];
     let totalPrice = 0;
@@ -560,13 +614,9 @@ app.post('/api/purchase', async (req, res) => {
     const responseData = {
       id: purchase._id,
       drawId: purchase.drawId,
-      drawLabel: `งวดประจำวันที่ ${activeDraw.drawDate.toLocaleDateString('th-TH', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })}`,
+      drawLabel: formatDrawLabel(activeDrawDate),
       drawSequence: activeDraw.sequence,
-      drawDate: activeDraw.drawDate,
+      drawDate: activeDrawDate,
       customerName: purchase.customerName,
       entries: purchase.entries.map((entry, index) => {
         const config = numberTypeConfig[entry.numberType];
