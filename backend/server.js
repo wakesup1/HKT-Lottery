@@ -38,7 +38,7 @@ const getGeminiModel = (() => {
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../frontend')));
 
 // ข้อมูลผลรางวัล
 let lotteryResults = {
@@ -1145,7 +1145,7 @@ app.get('/api/winners', async (req, res) => {
 
 // Serve frontend
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '../frontend', 'index.html'));
 });
 
 // Start server

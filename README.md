@@ -119,6 +119,9 @@ npm run migrate
 ### 6. รันโปรเจค
 
 ```bash
+# เข้าไปใน backend directory
+cd backend
+
 # Development mode (auto-reload)
 npm run dev
 
@@ -132,27 +135,35 @@ npm start
 http://localhost:3000
 ```
 
+หมายเหตุ: Backend จะ serve frontend อัตโนมัติที่ path `/`
+
 ## โครงสร้างโปรเจค
 
 ```
 HKT-Lottery/
-├── config/
-│   └── database.js           # MongoDB connection config
-├── models/
-│   ├── Purchase.js           # Purchase schema
-│   ├── LotteryResult.js      # Result schema
-│   └── Draw.js               # Draw schema
-├── public/
-│   ├── index.html            # หน้าเว็บหลัก
-│   ├── styles.css            # CSS styling
-│   ├── app.js                # Frontend JavaScript
-│   └── src/                  # Images & assets
-├── server.js                 # Express backend server
-├── migrate.js                # Database initialization script
-├── package.json              # Dependencies & scripts
-├── .env                      # Environment variables (ต้องสร้างเอง)
+├── backend/                  # Backend API Server
+│   ├── config/
+│   │   └── database.js       # MongoDB connection
+│   ├── models/
+│   │   ├── Purchase.js       # Purchase schema
+│   │   ├── LotteryResult.js  # Result schema
+│   │   └── Draw.js           # Draw schema
+│   ├── server.js             # Express server
+│   ├── migrate.js            # Database initialization
+│   ├── package.json          # Backend dependencies
+│   └── README.md             # Backend documentation
+│
+├── frontend/                 # Frontend Application
+│   ├── index.html            # Main HTML
+│   ├── app.js                # JavaScript logic
+│   ├── styles.css            # Styling
+│   ├── src/                  # Images & assets
+│   └── README.md             # Frontend documentation
+│
+├── .env                      # Environment variables (create this)
 ├── .gitignore                # Git ignore rules
-├── README.md                 # คู่มือหลัก
+├── package.json              # Root package.json
+├── README.md                 # Main documentation
 ├── DEPLOYMENT.md             # AWS EC2 deployment guide
 └── MONGODB_ATLAS_SETUP.md    # MongoDB Atlas setup guide
 ```
@@ -348,18 +359,18 @@ HKT-Lottery/
 }
 ```
 
-## 💡 วิธีใช้งาน
+## วิธีใช้งาน
 
 ### 1. ซื้อเลขลอตเตอร์รี่
-1. คลิกแท็บ "🎫 ซื้อลอตเตอร์รี่"
+1. คลิกแท็บ "ซื้อลอตเตอร์รี่"
 2. ตรวจสอบงวดที่เปิดให้ซื้อในกล่อง "งวดที่เปิดให้ซื้อ"
 3. กรอกชื่อ-นามสกุลผู้ซื้อ
-4. ใช้ปุ่ม "➕ เพิ่มเลข" เพื่อเพิ่มรายการแต่ละชุด:
+4. ใช้ปุ่ม "เพิ่มเลข" เพื่อเพิ่มรายการแต่ละชุด:
    - เลือกประเภทเลข (เลขท้าย 2 ตัว / เลขหน้า 3 ตัว / เลขท้าย 3 ตัว)
    - กรอกเลขให้ครบตามจำนวนหลักที่กำหนด
    - ระบุจำนวนใบ (ระบบคำนวณราคารวมให้อัตโนมัติ)
-5. เพิ่มหลายเลขในบิลเดียวได้ตามต้องการ หรือกด ✖ เพื่อลบรายการที่ไม่ต้องการ
-6. กด "🛒 ซื้อเลย" เพื่อบันทึกการซื้อ
+5. เพิ่มหลายเลขในบิลเดียวได้ตามต้องการ หรือกดปุ่มลบเพื่อลบรายการที่ไม่ต้องการ
+6. กด "ซื้อเลย" เพื่อบันทึกการซื้อ
 7. รายการซื้อและยอดรวมจะแสดงในแผงด้านขวา
 
 ### 2. ดูผลรางวัล
@@ -547,60 +558,3 @@ Developed with AI assistance
 ---
 
 **HKT Lottery** - ระบบขายลอตเตอร์รี่ออนไลน์พร้อม AI
-
-## 🎮 ตัวอย่างการใช้งาน
-
-### ตัวอย่างการซื้อเลข
-```
-ประเภท: เลขท้าย 2 ตัว
-เลข: 25
-จำนวน: 5 ใบ
-ราคารวม: 5 บาท
-```
-
-### ตัวอย่างการประกาศผล
-```
-รางวัลที่ 1: 123456
-เลขหน้า 3 ตัว: 123,456,789
-เลขท้าย 3 ตัว: 234,567,890
-เลขท้าย 2 ตัว: 25
-```
-
-### ตัวอย่างผลการทำนาย AI
-```
-เลขท้าย 2 ตัวแนะนำ: 25, 78, 34
-เลข 3 ตัวแนะนำ: 123, 456, 789
-
-พร้อมคำอธิบายและเหตุผลจาก AI
-```
-
-## 🐛 แก้ไขปัญหา
-
-### ปัญหา: CORS Error
-- ตรวจสอบว่า backend รันอยู่ที่ port 3000
-- ตรวจสอบการตั้งค่า CORS ใน `server.js`
-
-### ปัญหา: API Key ไม่ทำงาน
-- ตรวจสอบว่าใส่ API Key ถูกต้องในไฟล์ `.env`
-- ตรวจสอบว่ามี credit ใน OpenAI account
-- ลอง restart server ใหม่
-
-### ปัญหา: npm install ไม่ทำงาน
-- ลบโฟลเดอร์ `node_modules` และรันใหม่
-- ตรวจสอบเวอร์ชัน Node.js
-- ใช้ `npm cache clean --force`
-
-## 📞 การสนับสนุน
-
-หากมีปัญหาหรือข้อสงสัย:
-1. ตรวจสอบ Console ในเบราว์เซอร์ (F12)
-2. ตรวจสอบ Terminal ที่รัน server
-3. อ่าน error message อย่างละเอียด
-
-## 📄 License
-
-MIT License - ใช้งานได้อย่างอิสระ
-
-## 🎉 สนุกกับการพัฒนา!
-
-ขอให้โชคดีกับการขายลอตเตอร์รี่และการทำนายด้วย AI! 🍀

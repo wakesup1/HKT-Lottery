@@ -1,35 +1,36 @@
 {
-  "name": "lottery-prediction-website",
-  "version": "1.0.0",
-  "description": "เว็บไซต์ขายลอตเตอร์รี่พร้อมระบบทำนายด้วย AI",
-  "main": "server.js",
+  "name": "hkt-lottery",
+  "version": "2.0.0",
+  "description": "ระบบขายลอตเตอร์รี่ออนไลน์พร้อม AI - Full Stack Application",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "migrate": "node migrate.js",
-    "pm2:start": "pm2 start server.js --name lottery-app",
+    "start": "cd backend && node server.js",
+    "dev": "cd backend && nodemon server.js",
+    "migrate": "cd backend && node migrate.js",
+    "install:backend": "cd backend && npm install",
+    "install:all": "npm run install:backend",
+    "pm2:start": "cd backend && pm2 start server.js --name lottery-app",
     "pm2:stop": "pm2 stop lottery-app",
     "pm2:restart": "pm2 restart lottery-app",
     "pm2:logs": "pm2 logs lottery-app"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wakesup1/HKT-Lottery.git"
   },
   "keywords": [
     "lottery",
     "AI",
     "Gemini",
-    "prediction"
+    "prediction",
+    "MongoDB",
+    "Express",
+    "Node.js"
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "mongodb": "^7.0.0",
-    "mongoose": "^8.19.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

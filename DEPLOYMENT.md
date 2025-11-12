@@ -1,6 +1,6 @@
-# Lottery System - Deployment Guide
+# Deployment Guide - AWS EC2
 
-## 📋 Pre-deployment Checklist
+## Pre-deployment Checklist
 
 - [ ] ติดตั้ง dependencies: `npm install`
 - [ ] ตั้งค่า `.env` file
@@ -8,7 +8,7 @@
 - [ ] เชื่อมต่อ MongoDB Atlas
 - [ ] เตรียม AWS account
 
-## 🚀 AWS EC2 Deployment
+## AWS EC2 Deployment
 
 ### 1. Launch EC2 Instance
 
@@ -141,7 +141,7 @@ Follow prompts and select option 2 (redirect HTTP to HTTPS)
 sudo certbot renew --dry-run
 ```
 
-## 🗄️ MongoDB Atlas Setup
+## MongoDB Atlas Setup
 
 1. Go to https://www.mongodb.com/cloud/atlas
 2. Create a FREE cluster (M0)
@@ -156,7 +156,7 @@ sudo certbot renew --dry-run
    - Copy connection string
    - Replace `<password>` with your password
 
-## 📊 Monitoring
+## Monitoring
 
 ### Check Application Status
 ```bash
@@ -179,7 +179,7 @@ df -h
 free -h
 ```
 
-## 🔄 Update Deployment
+## Update Deployment
 
 ```bash
 cd /home/ubuntu/lottery-app
@@ -188,7 +188,7 @@ npm install
 pm2 restart lottery-app
 ```
 
-## 🔐 Security Best Practices
+## Security Best Practices
 
 1. **Firewall Setup:**
 ```bash
@@ -212,7 +212,7 @@ sudo systemctl enable fail2ban
 sudo systemctl start fail2ban
 ```
 
-## 💰 Cost Estimation (Monthly)
+## Cost Estimation (Monthly)
 
 - **EC2 t2.micro**: $8-10 (Free for 12 months)
 - **MongoDB Atlas M0**: $0 (512MB free forever)
@@ -222,7 +222,7 @@ sudo systemctl start fail2ban
 
 **Total: $10-20/month** (after free tier)
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Application won't start
 ```bash
@@ -247,7 +247,7 @@ sudo lsof -i :3000
 sudo kill -9 <PID>
 ```
 
-## 📞 Support
+## Support
 
 For issues, check:
 - Application logs: `pm2 logs lottery-app`

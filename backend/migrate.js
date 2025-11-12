@@ -9,14 +9,14 @@ const initializeDraws = async () => {
   try {
     await connectDB();
     
-    console.log('🔄 กำลัง Migration ข้อมูลเริ่มต้น...\n');
+    console.log('กำลัง Migration ข้อมูลเริ่มต้น...\n');
     
     // Clear existing data (ระวัง! ใช้เฉพาะครั้งแรก)
     await Draw.deleteMany({});
     await LotteryResult.deleteMany({});
     await Purchase.deleteMany({});
     
-    console.log('✅ ล้างข้อมูลเดิมเรียบร้อย');
+    console.log('ล้างข้อมูลเดิมเรียบร้อย');
     
     // Create initial draw
     const now = new Date();
@@ -32,17 +32,17 @@ const initializeDraws = async () => {
     });
     
     await initialDraw.save();
-    console.log(`✅ สร้างงวดเริ่มต้น: ${initialDraw.label}`);
+    console.log(`สร้างงวดเริ่มต้น: ${initialDraw.label}`);
     
-    console.log('\n✨ Migration เสร็จสมบูรณ์!\n');
-    console.log('📊 สถิติ:');
+    console.log('\n Migration เสร็จสมบูรณ์!\n');
+    console.log('สถิติ:');
     console.log(`   - Draws: ${await Draw.countDocuments()}`);
     console.log(`   - Results: ${await LotteryResult.countDocuments()}`);
     console.log(`   - Purchases: ${await Purchase.countDocuments()}`);
     
     process.exit(0);
   } catch (error) {
-    console.error('❌ Migration ล้มเหลว:', error);
+    console.error('Migration ล้มเหลว:', error);
     process.exit(1);
   }
 };
